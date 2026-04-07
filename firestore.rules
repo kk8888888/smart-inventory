@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidInventory(data) {
+      return data.sku is string &&
+             data.productName is string &&
+             data.currentStock is number &&
+             data.targetStock is number &&
+             data.expectedSales is number &&
+             data.unitCost is number &&
+             data.allocatedBudget is number &&
+             data.leadTime is number &&
+             data.seasonMultiplier is number &&
+             data.safetyBuffer is number;
+    }
+
+    function isValidActivity(data) {
+      return data.type in ['shipment', 'order', 'alert'] &&
+             data.description is string &&
+             data.timestamp is string;
+    }
+
+    // Inventory rules
+    match /inventory/{sku} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidInventory(request.resource.data);
+    }
+
+    // Activity rules
+    match /activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidActivity(request.resource.data);
+    }
+
+    // Chat history rules
+    match /chats/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
